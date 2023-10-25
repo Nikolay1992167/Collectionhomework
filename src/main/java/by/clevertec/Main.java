@@ -1,18 +1,15 @@
 package by.clevertec;
 
-import by.clevertec.model.Animal;
-import by.clevertec.model.Car;
-import by.clevertec.model.Examination;
-import by.clevertec.model.Flower;
-import by.clevertec.model.House;
-import by.clevertec.model.Person;
-import by.clevertec.model.Student;
+import by.clevertec.model.*;
 import by.clevertec.util.Util;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public class Main {
 
@@ -162,52 +159,158 @@ public class Main {
 
     public static void task13() {
         List<House> houses = Util.getHouses();
-//        houses.stream() Продолжить ...
+        final LocalDate now = LocalDate.now();
+        final LocalDate years18 = now.minusYears(18);
+        final LocalDate malePensionYear = now.minusYears(63).plusDays(1);
+        final LocalDate femalePensionYear = now.minusYears(58).plusDays(1);
+        houses.stream()
+                .flatMap(house -> house.getPersonList().stream()
+                        .map(person -> Map.entry("Hospital".equals(house.getBuildingType()) ? 1 : person.getDateOfBirth().isAfter(years18) ||
+                                ("Male".equals(person.getGender()) && person.getDateOfBirth().isBefore(malePensionYear)) ||
+                                ("Female".equals(person.getGender()) && person.getDateOfBirth().isBefore(femalePensionYear)) ? 2 : 3, person)))
+                .collect(Collectors.groupingBy(Map.Entry::getKey,
+                        Collectors.mapping(Map.Entry::getValue, Collectors.toList())))
+                .entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .flatMap(e -> e.getValue().stream())
+                .limit(500)
+                .forEach(System.out::println);
     }
 
     public static void task14() {
         List<Car> cars = Util.getCars();
-//        cars.stream() Продолжить ...
+        final BigDecimal costKilogram = BigDecimal.valueOf(7.14).multiply(BigDecimal.valueOf(0.01));
+        final Map<Integer, Predicate<Car>> predicates = new LinkedHashMap<>();
+        predicates.put(1, car -> (car.getCarMake().equals("Jaguar")) ||
+                car.getCarModel().equals("White"));
+        predicates.put(2, car -> (car.getMass() < 1500 ||
+                car.getCarMake().equals("BMW") ||
+                car.getCarMake().equals("Lexus") ||
+                car.getCarMake().equals("Chrysler") ||
+                car.getCarMake().equals("Toyota")));
+        predicates.put(3, car -> (car.getColor().equals("Black") && car.getMass() > 4000) ||
+                car.getCarMake().equals("GMC") ||
+                car.getCarMake().equals("Dodge"));
+        predicates.put(4, car -> (car.getReleaseYear() < 1982 ||
+                car.getCarModel().equals("Civic") ||
+                car.getCarModel().equals("Cherokee")));
+        predicates.put(5, car -> (!("Yellow".equals(car.getColor()) ||
+                "Red".equals(car.getColor()) ||
+                "Green".equals(car.getColor()) ||
+                "Blue".equals(car.getColor())) ||
+                car.getPrice() > 40000));
+        predicates.put(6, car -> (car.getVin() != null && car.getVin().contains("59")));
+        predicates.put(7, (car) -> true);
+        cars.stream()
+                .map(car -> Map.entry(predicates.entrySet().stream()
+                        .filter(entry -> entry.getValue().test(car))
+                        .findFirst()
+                        .get().getKey(), car))
+                .filter(entry -> entry.getKey() < 7)
+                .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.mapping(Map.Entry::getValue, Collectors.toList())))
+                .entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(Map.Entry::getValue)
+                .map(carList -> Map.entry(carList,
+                        costKilogram.multiply(BigDecimal.valueOf(carList.stream()
+                                .mapToInt(Car::getMass)
+                                .sum()))))
+                .peek(entry -> System.out.println(entry.getValue()))
+                .map(carCost -> carCost.getKey().stream()
+                        .map(car -> BigDecimal.valueOf(car.getPrice()))
+                        .reduce(BigDecimal::add)
+                        .orElse(BigDecimal.ZERO).subtract(carCost.getValue()))
+                .reduce(BigDecimal::add)
+                .ifPresent(System.out::println);
     }
 
     public static void task15() {
         List<Flower> flowers = Util.getFlowers();
-//        flowers.stream() Продолжить ...
+        final Set<String> prefeVaseMaterialSet = Set.of("Glass", "Aluminum", "Steel");
+        final double waterCostPerCubicMeter = 1.39;
+        final int timeInterval = 5 * 365;
+        double amountFounds = flowers.stream()
+                .sorted(Comparator.comparing(Flower::getOrigin).reversed()
+                        .thenComparing(Flower::getPrice)
+                        .thenComparing(Comparator.comparing(Flower::getWaterConsumptionPerDay).reversed()))
+                .filter(flower -> !flower.getCommonName().isEmpty())
+                .filter(flower -> flower.getCommonName().charAt(0) <= 'S')
+                .filter(f -> f.getCommonName().charAt(0) > 'C')
+                .filter(Flower::isShadePreferred)
+                .filter(flower -> flower.getFlowerVaseMaterial().stream().anyMatch(prefeVaseMaterialSet::contains))
+                .mapToDouble(flower -> flower.getPrice() + flower.getWaterConsumptionPerDay() * timeInterval * waterCostPerCubicMeter / 1000)
+                .sum();
+        System.out.printf("The total cost of maintenance of all plants: %.2f", amountFounds);
     }
 
     public static void task16() {
         List<Student> students = Util.getStudents();
-//        students.stream() Продолжить ...
+        students.stream()
+                .filter(student -> student.getAge() < 18)
+                .sorted(Comparator.comparing(Student::getSurname))
+                .forEach(student -> System.out.println(student.getSurname() + ", age:" + student.getAge()));
     }
 
     public static void task17() {
         List<Student> students = Util.getStudents();
-//        students.stream() Продолжить ...
+        students.stream()
+                .map(Student::getGroup)
+                .distinct()
+                .forEach(System.out::println);
     }
 
     public static void task18() {
         List<Student> students = Util.getStudents();
-        List<Examination> examinations = Util.getExaminations();
-//        students.stream() Продолжить ...
+        students.stream()
+                .collect(Collectors.groupingBy(Student::getFaculty,
+                        Collectors.averagingInt(Student::getAge)))
+                .entrySet()
+                .stream()
+                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                .forEach(entry -> System.out.println("Faculty: " + entry.getKey() + ", middle age: " + Math.round(entry.getValue())));
     }
 
     public static void task19() {
         List<Student> students = Util.getStudents();
-//        students.stream() Продолжить ...
+        List<Examination> examinations = Util.getExaminations();
+        final String groupName = "C-2";
+        students.stream()
+                .filter(student -> student.getGroup().equals(groupName))
+                .filter(student -> examinations.stream()
+                        .anyMatch(exam -> exam.getStudentId() == student.getId() && exam.getExam1() > 4 && exam.getExam2() > 4 && exam.getExam3() > 4))
+                .forEach(System.out::println);
     }
 
     public static void task20() {
         List<Student> students = Util.getStudents();
-//        students.stream() Продолжить ...
+        List<Examination> examinations = Util.getExaminations();
+        students.stream()
+                .collect(Collectors.groupingBy(Student::getFaculty,
+                        Collectors.averagingDouble(student -> examinations.stream()
+                                .filter(exam -> exam.getStudentId() == student.getId())
+                                .mapToDouble(Examination::getExam1)
+                                .average()
+                                .orElse(0))))
+                .entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .ifPresent(entry -> System.out.println("Faculty: " + entry.getKey() + " Max rating: " + entry.getValue()));
     }
 
     public static void task21() {
         List<Student> students = Util.getStudents();
-//        students.stream() Продолжить ...
+        students.stream()
+                .collect(Collectors.groupingBy(Student::getGroup, Collectors.counting()))
+                .forEach((group, count) -> System.out.println("Group: " + group + ", count: " + count));
     }
 
     public static void task22() {
         List<Student> students = Util.getStudents();
-//        students.stream() Продолжить ...
+        students.stream()
+                .collect(Collectors.groupingBy(Student::getFaculty,
+                        Collectors.minBy(Comparator.comparingInt(Student::getAge))))
+                .forEach((faculty, student) ->
+                        System.out.println("Faculty: " + faculty + ", min age of student: " + student.get().getAge())
+                );
     }
 }
+
